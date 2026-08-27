@@ -9,7 +9,7 @@ services:
     name: weekly-report-orchestrator
     runtime: node
     rootDir: weekly-report-service
-    schedule: "<PLACEHOLDER - confirm target weekly anchor time before deploy>"
+    schedule: "30 5 * * 3"
     buildCommand: npm install && npm run build
     startCommand: npm run weekly-report
     envVars:
