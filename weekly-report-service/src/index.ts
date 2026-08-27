@@ -5,25 +5,20 @@ import { computeCorrelations } from "./reconcile/correlate.js";
 import { reconcile } from "./reconcile/index.js";
 import { loadMapping } from "./reconcile/mapping.js";
 import { renderReport } from "./report/render.js";
-import { openDb } from "./storage/db.js";
-import { getLatestSnapshotBefore, getTrailingSnapshots, insertSnapshot } from "./storage/snapshot.js";
+import type { SnapshotRecord } from "./types.js";
 
 async function main() {
   await applyCronJitter();
   const { weekStart, weekEnd } = reportWeek();
-  const db = await openDb();
   const mapping = loadMapping();
   const pulled = await pullData(weekStart, weekEnd);
-  const prior = await getLatestSnapshotBefore(db, weekStart);
-  const reconciled = reconcile({ ...pulled, mapping, priorSnapshot: prior });
+  const history: SnapshotRecord[] = [];
+  const reconciled = reconcile({ ...pulled, mapping, priorSnapshot: null });
   const windowWeeks = Number(process.env.CORRELATION_WINDOW_WEEKS ?? 6);
-  const history = await getTrailingSnapshots(db, weekStart, windowWeeks);
   const correlations = computeCorrelations(reconciled, history, windowWeeks);
   const summary = await summarizeReport(reconciled, correlations);
-  await insertSnapshot(db, pulled, reconciled, summary);
   const reportFile = renderReport({ report: reconciled, correlations, summaryText: summary, history });
   await deliverReport(reportFile);
-  await db.end();
 }
 
 function reportWeek() {

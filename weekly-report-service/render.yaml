@@ -1,9 +1,3 @@
-databases:
-  - name: weekly-report-db
-    plan: basic-256mb
-    databaseName: weekly_report
-    user: weekly_report
-
 services:
   - type: cron
     name: weekly-report-orchestrator
@@ -12,10 +6,6 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm run weekly-report
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: weekly-report-db
-          property: connectionString
       - key: FRESHSALES_MCP_URL
         sync: false
       - key: META_MCP_OAUTH_SESSION_PATH
@@ -25,7 +15,7 @@ services:
       - key: GROQ_MODEL
         value: openai/gpt-oss-20b
       - key: NOTIFICATION_CHANNEL
-        sync: false
+        value: notion
       - key: CORRELATION_WINDOW_WEEKS
         value: "6"
       - key: CRON_JITTER_MINUTES
@@ -33,21 +23,4 @@ services:
       - key: META_MCP_CALL_TIMEOUT_MS
         value: "240000"
       - key: REPORT_OUTPUT_DIR
-        sync: false
-
-  - type: web
-    name: weekly-report-chat
-    runtime: node
-    buildCommand: npm install && npm run build
-    startCommand: npm run start:chat
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: weekly-report-db
-          property: connectionString
-      - key: GROQ_API_KEY
-        sync: false
-      - key: GROQ_MODEL
-        value: openai/gpt-oss-20b
-      - key: CHAT_ALLOWED_ORIGIN
-        sync: false
+        value: reports

@@ -35,8 +35,6 @@
       summary { cursor: pointer; font-weight: 720; }
       .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
       .correlations { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
-      .chat { position: fixed; right: 18px; bottom: 18px; width: min(360px, calc(100vw - 36px)); border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 12px 30px rgba(0,0,0,.14); padding: 12px; }
-      .chat textarea { width: 100%; min-height: 70px; resize: vertical; }
       button, select { border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 8px 10px; font-weight: 700; }
       @media (max-width: 680px) { .app { display: block; } aside { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 14px; } nav { display: flex; gap: 8px; overflow-x: auto; } nav a { white-space: nowrap; } main { padding: 16px; } .kpis { grid-template-columns: 1fr 1fr; } .kpi.hero { grid-column: span 1; } .grid2 { grid-template-columns: 1fr; } }
     </style>
@@ -51,7 +49,6 @@
         <section id="correlations"><h2>Correlations</h2><div class="correlations" id="correlationList"></div></section>
       </main>
     </div>
-    <form class="chat" id="chat"><strong>Ask this report</strong><textarea name="question" required></textarea><button type="submit">Send</button><p class="muted" id="chatAnswer"></p></form>
     <script>
       const data = JSON.parse("__REPORT_DATA__");
       const fmt = new Intl.NumberFormat("en-US");
@@ -73,7 +70,6 @@
       gaps.innerHTML = report.gaps.length ? report.gaps.map(g=>`<div class="verdict warn"><b>${esc(g.type)}</b><br>${esc(g.label)}: ${esc(g.amount)}</div>`).join("") : `<div class="verdict ok"><b>OK</b><br>No reconciliation gaps.</div>`;
       correlationList.innerHTML = data.correlations.map(c => c.status === "not_enough_history" ? `<div class="chip">Not enough history yet (${c.availablePriorSnapshots}/${c.requiredPriorSnapshots})</div>` : `<div class="chip"><b>${esc(c.sourceKey)} ${esc(c.metric)}</b><br>${c.drivers.map(d=>`${esc(d.driver)} ${d.phrase} (${d.score.toFixed(2)})`).join("<br>")}</div>`).join("");
       let chart; metric.onchange = drawTrend; drawTrend(); document.querySelectorAll(".spark").forEach(drawSpark);
-      chat.onsubmit = async e => { e.preventDefault(); chatAnswer.textContent = "Thinking..."; const body = { week: report.weekStart, question: new FormData(chat).get("question") }; const res = await fetch("/api/chat", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }); chatAnswer.textContent = res.ok ? (await res.json()).answer : "Chat is unavailable."; };
       function table(headers, rows) { return `<thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>`; }
       function delta(v) { return v == null ? "No prior week" : `${v >= 0 ? "Up" : "Down"} ${(Math.abs(v)*100).toFixed(1)}%`; }
       function drawTrend() { const m = metric.value; const labels = [...data.history.map(h=>h.weekStart), report.weekStart]; const values = [...data.history.map(h=>h.totals[m] ?? 0), total[m] ?? 0]; chart?.destroy(); chart = new Chart(trend, { type:"line", data:{ labels, datasets:[{ data:values, borderColor:"#0f6b7f", tension:.3 }] }, options:{ plugins:{ legend:{ display:false } } } }); }
