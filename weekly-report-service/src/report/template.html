@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hexalog Weekly Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      :root { color-scheme: light; --ink:#172026; --muted:#5d6b75; --line:#d8dee4; --panel:#f7f8f8; --ok:#137333; --warn:#946200; --bad:#b3261e; --accent:#0f6b7f; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: #fff; }
+      .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+      aside { position: sticky; top: 0; height: 100vh; border-right: 1px solid var(--line); padding: 24px 18px; background: #fbfbfa; }
+      .brand { font-size: 22px; font-weight: 760; margin-bottom: 28px; }
+      nav a { display: block; color: var(--ink); text-decoration: none; padding: 10px 8px; border-radius: 6px; font-weight: 650; }
+      nav a:hover { background: #e8f2f4; }
+      main { padding: 28px; max-width: 1280px; width: 100%; }
+      h1 { font-size: 30px; margin: 0 0 6px; }
+      h2 { font-size: 20px; margin: 28px 0 14px; }
+      .muted { color: var(--muted); }
+      .kpis { position: sticky; top: 0; z-index: 3; background: rgba(255,255,255,.96); display: grid; grid-template-columns: repeat(6, minmax(140px, 1fr)); gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+      .kpi { border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-height: 118px; background: #fff; }
+      .kpi.hero { grid-column: span 2; min-height: 136px; }
+      .kpi b { display: block; font-size: 13px; color: var(--muted); }
+      .kpi strong { display: block; font-size: 28px; margin: 6px 0; }
+      .kpi.hero strong { font-size: 38px; }
+      .spark { width: 100%; height: 28px; }
+      .verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+      .verdict, .chip { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--panel); }
+      .ok { border-left: 5px solid var(--ok); } .warn { border-left: 5px solid var(--warn); } .critical { border-left: 5px solid var(--bad); }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { border-bottom: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; }
+      th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+      details { border-top: 1px solid var(--line); padding: 12px 0; }
+      summary { cursor: pointer; font-weight: 720; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .correlations { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+      .chat { position: fixed; right: 18px; bottom: 18px; width: min(360px, calc(100vw - 36px)); border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 12px 30px rgba(0,0,0,.14); padding: 12px; }
+      .chat textarea { width: 100%; min-height: 70px; resize: vertical; }
+      button, select { border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 8px 10px; font-weight: 700; }
+      @media (max-width: 680px) { .app { display: block; } aside { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 14px; } nav { display: flex; gap: 8px; overflow-x: auto; } nav a { white-space: nowrap; } main { padding: 16px; } .kpis { grid-template-columns: 1fr 1fr; } .kpi.hero { grid-column: span 1; } .grid2 { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside><div class="brand">Hexalog</div><nav><a href="#overview">Overview</a><a href="#lead-gen">Lead Gen</a><a href="#awareness">Awareness</a><a href="#correlations">Correlations</a></nav></aside>
+      <main>
+        <section id="overview"><h1>Weekly Report</h1><div class="muted" id="range"></div><div class="kpis" id="kpis"></div><h2>Verdict</h2><div class="verdicts" id="verdicts"></div><p id="summary"></p></section>
+        <section id="lead-gen"><h2>Lead Gen</h2><div class="grid2"><div><h3>Freshsales vs Meta</h3><table id="recon"></table></div><div><h3>Gaps</h3><div id="gaps"></div></div></div><details open><summary>Funnel breakdown</summary><table id="funnel"></table></details><details><summary>Ad set tables</summary><table id="adsets"></table></details></section>
+        <section id="awareness"><h2>Awareness</h2><label>Metric <select id="metric"><option value="spend">Spend</option><option value="impressions">Impressions</option><option value="clicks">Clicks</option><option value="ctr">CTR</option><option value="cpm">CPM</option></select></label><canvas id="trend" height="120"></canvas><details><summary>Platform split</summary><table id="platform"></table></details></section>
+        <section id="correlations"><h2>Correlations</h2><div class="correlations" id="correlationList"></div></section>
+      </main>
+    </div>
+    <form class="chat" id="chat"><strong>Ask this report</strong><textarea name="question" required></textarea><button type="submit">Send</button><p class="muted" id="chatAnswer"></p></form>
+    <script>
+      const data = JSON.parse("__REPORT_DATA__");
+      const fmt = new Intl.NumberFormat("en-US");
+      const money = v => v == null ? "n/a" : "$" + fmt.format(Number(v).toFixed(2));
+      const pct = v => v == null ? "n/a" : (v * 100).toFixed(1) + "%";
+      const num = v => v == null ? "n/a" : fmt.format(Math.round(v));
+      const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+      const report = data.report, total = report.totals;
+      range.textContent = `${report.weekStart} to ${report.weekEnd}`;
+      summary.textContent = data.summaryText;
+      const metrics = [["leads","Leads",num],["qualifiedLeads","Qualified",num],["spend","Spend",money],["cpl","CPL",money],["cpql","CPQL",money],["conversionRate","Conv.",pct]];
+      const ranked = [...metrics].sort((a,b)=>Math.abs(total.deltas?.[b[0]] ?? 0)-Math.abs(total.deltas?.[a[0]] ?? 0)).slice(0,3).map(m=>m[0]);
+      kpis.innerHTML = metrics.map(([key,label,format])=>`<div class="kpi ${ranked.includes(key) ? "hero" : ""}"><b>${label}</b><strong>${format(total[key])}</strong><span class="muted">${delta(total.deltas?.[key])}</span><canvas class="spark" data-metric="${key}"></canvas></div>`).join("");
+      verdicts.innerHTML = report.rows.flatMap(row => Object.entries(row.flags).filter(([,f])=>f==="warn"||f==="critical").map(([m,f])=>`<div class="verdict ${f}"><b>${f==="critical"?"Flag":"Watch"}: ${esc(row.label)}</b><br>${esc(m)} is ${f}</div>`)).join("") || `<div class="verdict ok"><b>OK</b><br>No benchmark flags this week.</div>`;
+      recon.innerHTML = table(["Source","Leads","Qualified","Spend","CPL","CPQL","Conv."], report.rows.map(r=>[r.label,num(r.leads),num(r.qualifiedLeads),money(r.spend),money(r.cpl),money(r.cpql),pct(r.conversionRate)]));
+      funnel.innerHTML = recon.innerHTML;
+      adsets.innerHTML = table(["Campaign","Ad set","Spend","Clicks","CTR","CPM"], report.rows.map(r=>[r.metaCampaignId,r.metaAdsetId || "All",money(r.spend),num(r.clicks),pct(r.ctr),money(r.cpm)]));
+      platform.innerHTML = table(["Source","Reach","Impressions","Clicks"], report.rows.map(r=>[r.label,num(r.reach),num(r.impressions),num(r.clicks)]));
+      gaps.innerHTML = report.gaps.length ? report.gaps.map(g=>`<div class="verdict warn"><b>${esc(g.type)}</b><br>${esc(g.label)}: ${esc(g.amount)}</div>`).join("") : `<div class="verdict ok"><b>OK</b><br>No reconciliation gaps.</div>`;
+      correlationList.innerHTML = data.correlations.map(c => c.status === "not_enough_history" ? `<div class="chip">Not enough history yet (${c.availablePriorSnapshots}/${c.requiredPriorSnapshots})</div>` : `<div class="chip"><b>${esc(c.sourceKey)} ${esc(c.metric)}</b><br>${c.drivers.map(d=>`${esc(d.driver)} ${d.phrase} (${d.score.toFixed(2)})`).join("<br>")}</div>`).join("");
+      let chart; metric.onchange = drawTrend; drawTrend(); document.querySelectorAll(".spark").forEach(drawSpark);
+      chat.onsubmit = async e => { e.preventDefault(); chatAnswer.textContent = "Thinking..."; const body = { week: report.weekStart, question: new FormData(chat).get("question") }; const res = await fetch("/api/chat", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }); chatAnswer.textContent = res.ok ? (await res.json()).answer : "Chat is unavailable."; };
+      function table(headers, rows) { return `<thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>`; }
+      function delta(v) { return v == null ? "No prior week" : `${v >= 0 ? "Up" : "Down"} ${(Math.abs(v)*100).toFixed(1)}%`; }
+      function drawTrend() { const m = metric.value; const labels = [...data.history.map(h=>h.weekStart), report.weekStart]; const values = [...data.history.map(h=>h.totals[m] ?? 0), total[m] ?? 0]; chart?.destroy(); chart = new Chart(trend, { type:"line", data:{ labels, datasets:[{ data:values, borderColor:"#0f6b7f", tension:.3 }] }, options:{ plugins:{ legend:{ display:false } } } }); }
+      function drawSpark(canvas) { const m = canvas.dataset.metric; const values = [...data.history.map(h=>h.totals[m] ?? 0), total[m] ?? 0]; new Chart(canvas, { type:"line", data:{ labels: values.map((_,i)=>i), datasets:[{ data: values, borderColor:"#0f6b7f", pointRadius:0 }] }, options:{ responsive:true, plugins:{ legend:{ display:false }, tooltip:{ enabled:false } }, scales:{ x:{ display:false }, y:{ display:false } } } }); }
+    </script>
+  </body>
+</html>

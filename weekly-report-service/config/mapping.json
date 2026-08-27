@@ -1,0 +1,19 @@
+{
+  "qualifiedContactStatusId": "402002304551",
+  "qualifiedContactStatusName": "CC Qualified",
+  "secondaryQualificationCandidate": {
+    "field": "cf_qualification_status",
+    "value": "1620",
+    "label": "Qualified",
+    "usedForMetric": false
+  },
+  "sources": [
+    {
+      "sourceKey": "example-source",
+      "freshsalesLeadSourceId": "replace-with-freshsales-lead-source-id",
+      "metaCampaignId": "replace-with-meta-campaign-id",
+      "metaAdsetId": null,
+      "label": "Replace with finalized attribution mapping"
+    }
+  ]
+}

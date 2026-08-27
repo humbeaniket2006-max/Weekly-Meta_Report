@@ -1,0 +1,7 @@
+{
+  "cpl": { "okMax": 100, "warnMax": 150 },
+  "cpql": { "okMax": 300, "warnMax": 450 },
+  "conversionRate": { "okMin": 0.2, "warnMin": 0.1 },
+  "ctr": { "okMin": 0.01, "warnMin": 0.005 },
+  "cpm": { "okMax": 40, "warnMax": 65 }
+}
