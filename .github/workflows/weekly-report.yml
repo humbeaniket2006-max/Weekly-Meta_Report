@@ -37,6 +37,7 @@ jobs:
         run: npm run weekly-report
         env:
           FRESHSALES_MCP_URL: ${{ secrets.FRESHSALES_MCP_URL }}
+          FRESHSALES_MCP_TOKEN: ${{ secrets.FRESHSALES_MCP_TOKEN }}
           META_MCP_OAUTH_SESSION_PATH: ${{ secrets.META_MCP_OAUTH_SESSION_PATH }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}

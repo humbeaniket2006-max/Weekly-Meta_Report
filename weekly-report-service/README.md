@@ -32,7 +32,7 @@ turso db create hexalog-weekly-report
 turso db tokens create hexalog-weekly-report
 ```
 
-Add `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` as GitHub Actions repository secrets alongside `FRESHSALES_MCP_URL`, `META_MCP_OAUTH_SESSION_PATH`, and `GROQ_API_KEY`. Storage errors are allowed to fail the run so the report does not silently render without history.
+Add `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` as GitHub Actions repository secrets alongside `FRESHSALES_MCP_URL`, `FRESHSALES_MCP_TOKEN`, `META_MCP_OAUTH_SESSION_PATH`, and `GROQ_API_KEY`. Storage errors are allowed to fail the run so the report does not silently render without history.
 
 ## Publishing
 

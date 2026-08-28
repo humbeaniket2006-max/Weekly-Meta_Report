@@ -55,7 +55,13 @@ const metaInsightSchema = z.object({
   publisher_platform: z.string().nullable().optional()
 });
 
-const freshsalesResponseSchema = z.object({ leads: z.array(freshsalesLeadSchema) });
+const queryRecordsResponseSchema = z.object({
+  records: z.array(z.record(z.unknown())),
+  total: z.number(),
+  page: z.number(),
+  per_page: z.number(),
+  truncated: z.boolean()
+});
 const metaResponseSchema = z.object({ insights: z.array(metaInsightSchema) });
 
 const META_FIELDS = ["spend", "impressions", "clicks", "ctr", "cpc", "cpm", "reach", "actions", "cost_per_action_type"] as const;
@@ -68,15 +74,30 @@ export async function pullData(weekStart: string, weekEnd: string): Promise<Pull
   return { weekStart, weekEnd, freshsales, meta };
 }
 
-async function pullFreshsales(weekStart: string, weekEnd: string): Promise<FreshsalesLead[]> {
-  const client = await connectMcp("freshsales", requiredEnv("FRESHSALES_MCP_URL"));
+export async function pullFreshsales(weekStart: string, weekEnd: string): Promise<FreshsalesLead[]> {
+  const client = await connectMcp("freshsales", requiredEnv("FRESHSALES_MCP_URL"), requiredEnv("FRESHSALES_MCP_TOKEN"));
   try {
-    const result = await callToolWithRetry(client, process.env.FRESHSALES_MCP_LEADS_TOOL ?? "list_leads", {
-      created_from: weekStart,
-      created_to: weekEnd,
-      fields: FRESHSALES_FIELDS
-    });
-    return freshsalesResponseSchema.parse(result).leads;
+    const allRecords: Record<string, unknown>[] = [];
+    let page = 1;
+    const perPage = 100;
+    while (true) {
+      const result = await callToolWithRetry(client, "query_records", {
+        entity: "contacts",
+        filters: [{ field: "created_at", operator: "between", value: [weekStart, weekEnd] }],
+        fields: FRESHSALES_FIELDS,
+        page,
+        per_page: perPage
+      });
+      const parsed = queryRecordsResponseSchema.parse(result);
+      if (parsed.truncated) {
+        throw new Error("Freshsales query_records returned a truncated result set - narrow the filter or split the pull.");
+      }
+      allRecords.push(...parsed.records);
+      if (allRecords.length >= parsed.total || parsed.records.length < perPage) break;
+      page += 1;
+      if (page > 1000) throw new Error("Freshsales pull exceeded max page count (1000) - investigate before retrying.");
+    }
+    return allRecords.map((record) => freshsalesLeadSchema.parse(record));
   } finally {
     await client.close();
   }
@@ -101,9 +122,13 @@ async function pullMetaInsights(weekStart: string, weekEnd: string): Promise<Met
   }
 }
 
-async function connectMcp(name: string, url: string) {
+async function connectMcp(name: string, url: string, bearerToken?: string) {
   const client = new Client({ name: `hexalog-weekly-report-${name}`, version: "1.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(new URL(url)));
+  const transport = new StreamableHTTPClientTransport(
+    new URL(url),
+    bearerToken ? { requestInit: { headers: { Authorization: `Bearer ${bearerToken}` } } } : undefined
+  );
+  await client.connect(transport);
   return client;
 }
 
