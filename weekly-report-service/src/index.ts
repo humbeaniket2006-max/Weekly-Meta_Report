@@ -5,20 +5,34 @@ import { computeCorrelations } from "./reconcile/correlate.js";
 import { reconcile } from "./reconcile/index.js";
 import { loadMapping } from "./reconcile/mapping.js";
 import { renderReport } from "./report/render.js";
-import type { SnapshotRecord } from "./types.js";
+import { publishToGithubPages } from "./publish/githubPages.js";
+import { createNotionReportPage } from "./publish/notion.js";
+import { initSchema } from "./storage/db.js";
+import { getLatestSnapshot, getSnapshotHistory, saveSnapshot } from "./storage/snapshot.js";
+import type { ReconciledReport } from "./types.js";
 
 async function main() {
   await applyCronJitter();
+  await initSchema();
   const { weekStart, weekEnd } = reportWeek();
   const mapping = loadMapping();
   const pulled = await pullData(weekStart, weekEnd);
-  const history: SnapshotRecord[] = [];
-  const reconciled = reconcile({ ...pulled, mapping, priorSnapshot: null });
+  const priorSnapshot = await getLatestSnapshot(weekStart);
   const windowWeeks = Number(process.env.CORRELATION_WINDOW_WEEKS ?? 6);
+  const history = await getSnapshotHistory(windowWeeks, weekStart);
+  const reconciled = reconcile({ ...pulled, mapping, priorSnapshot });
   const correlations = computeCorrelations(reconciled, history, windowWeeks);
   const summary = await summarizeReport(reconciled, correlations);
+  await saveSnapshot({
+    weekStart,
+    weekEnd,
+    freshsalesJson: JSON.stringify(pulled.freshsales),
+    metaJson: JSON.stringify(pulled.meta),
+    reconciledJson: JSON.stringify(reconciled),
+    summaryText: summary
+  });
   const reportFile = renderReport({ report: reconciled, correlations, summaryText: summary, history });
-  await deliverReport(reportFile);
+  await deliverReport(reportFile, reconciled, summary, weekStart, weekEnd);
 }
 
 function reportWeek() {
@@ -40,22 +54,30 @@ async function applyCronJitter() {
   if (offsetMs > 0) await new Promise((resolve) => setTimeout(resolve, offsetMs));
 }
 
-async function deliverReport(reportFile: string) {
-  if ((process.env.NOTIFICATION_CHANNEL ?? "notion") !== "notion") {
+async function deliverReport(reportFile: string, report: ReconciledReport, summary: string, weekStart: string, weekEnd: string) {
+  const channel = process.env.NOTIFICATION_CHANNEL ?? "notion";
+  if (channel !== "notion") {
     console.info(`Report rendered: ${reportFile}`);
     return;
   }
-  const notionWebhook = process.env.NOTION_WEBHOOK_URL;
-  if (!notionWebhook) {
-    console.info(`Report rendered for Notion delivery: ${reportFile}. Configure NOTION_WEBHOOK_URL or attach this artifact in your Render notification step.`);
-    return;
-  }
-  const response = await fetch(notionWebhook, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reportFile })
+
+  const reportUrl = publishToGithubPages(reportFile, weekStart);
+
+  const headlineMetrics = [
+    { label: "Total leads", value: String(report.totals.leads) },
+    { label: "Qualified leads", value: String(report.totals.qualifiedLeads) },
+    { label: "Spend", value: `₹${report.totals.spend.toFixed(2)}` },
+    { label: "Cost per lead", value: report.totals.cpl != null ? `₹${report.totals.cpl.toFixed(2)}` : "N/A" }
+  ];
+
+  await createNotionReportPage({
+    weekStart,
+    weekEnd,
+    reportUrl,
+    summaryText: summary,
+    headlineMetrics,
+    gaps: report.gaps.map((gap) => ({ label: gap.label, amount: gap.amount }))
   });
-  if (!response.ok) throw new Error(`Notion delivery failed: ${response.status}`);
 }
 
 main().catch((error) => {

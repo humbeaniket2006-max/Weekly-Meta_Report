@@ -2,7 +2,7 @@
 
 One scheduled service:
 
-- `npm run weekly-report`: Render Cron Job entry point. Pulls Freshsales and Meta Ads through MCP, reconciles the current week, renders HTML, and delivers/notifies for Notion.
+- `npm run weekly-report`: GitHub Actions entry point. Pulls Freshsales and Meta Ads through MCP, stores the weekly snapshot in Turso, reconciles the current week, renders HTML, and delivers/notifies for Notion.
 
 ## Setup
 
@@ -18,8 +18,28 @@ Qualified leads use `contact_status_id = 402002304551` (`CC Qualified`). The sec
 
 ## Scheduling
 
-Do not add an in-process scheduler. Configure Render Cron or GitHub Actions to invoke `npm run weekly-report` weekly. The script applies `CRON_JITTER_MINUTES` at runtime, defaulting to plus/minus 30 minutes.
+Do not add an in-process scheduler. Configure GitHub Actions to invoke `npm run weekly-report` weekly. The script applies `CRON_JITTER_MINUTES` at runtime, defaulting to plus/minus 30 minutes.
 
 ## Storage
 
-This static-report deployment does not use a database or always-on chat service. Correlation output will show that there is not enough stored history unless historical snapshots are reintroduced later.
+Create a Turso database for weekly snapshots:
+
+```sh
+brew tap libsql/sqld
+brew trust --formula libsql/sqld/sqld
+brew install tursodatabase/tap/turso
+turso db create hexalog-weekly-report
+turso db tokens create hexalog-weekly-report
+```
+
+Add `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` as GitHub Actions repository secrets alongside `FRESHSALES_MCP_URL`, `META_MCP_OAUTH_SESSION_PATH`, and `GROQ_API_KEY`. Storage errors are allowed to fail the run so the report does not silently render without history.
+
+## Publishing
+
+One-time repository setup:
+
+1. In repository settings, set Pages to deploy from branch `main` and folder `/docs`.
+2. Create a Notion integration at `notion.so/my-integrations`, then add its secret as the `NOTION_API_KEY` GitHub Actions repository secret.
+3. Create or choose the Notion page that will hold weekly reports, share it with the integration from the page's Connections menu, then copy its page ID from the URL into the `NOTION_PARENT_ID` GitHub Actions repository secret.
+
+If `NOTION_PARENT_ID` points to a database instead of a page, set the GitHub Actions repository variable `NOTION_PARENT_TYPE=database`; otherwise it defaults to `page`.
